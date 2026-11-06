@@ -12,5 +12,5 @@
 //   - API restriction: Books API only
 // Never put any other kind of key or secret in this file.
 const CONFIG = {
-  GOOGLE_BOOKS_KEY: '',
+  GOOGLE_BOOKS_KEY: 'AIzaSyCQ3duPMKO0oFWwHDk8hav1TE_EFMAzrso',
 };

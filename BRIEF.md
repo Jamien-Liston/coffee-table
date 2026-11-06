@@ -1,6 +1,6 @@
-# coffee-table: Claude Code brief v0.1
+# coffee-table: Claude Code brief
 
-Working name is a placeholder; I'll rename it before creating the repo.
+v0.1 is built and live (v0.1.0). Build v0.2 next; v0.3 stays parked.
 
 ## What it is
 
@@ -36,13 +36,36 @@ Opening a book by hand skews towards the middle and towards wherever the spine a
 - Tracking which pages I've seen
 - Notifications or reminders
 
-## v0.2—parked, don't build yet
+## v0.2 scope
 
-Photograph the cover, or the ISBN on the back, and have Claude read it through a Cloudflare Worker—the same pattern as Mirage (`ANTHROPIC_API_KEY` as a Worker secret, passphrase-protected). The ISBN pins the exact edition, so the page count lines up. Use a plain file input with `capture` rather than a live camera view. Once a Worker exists, consider moving storage to KV.
+**Same shelf on every device.** Books live in Cloudflare KV behind a Worker, following Mirage's pattern: suggested name `coffee-table-api`, passphrase stored as a Worker secret, entered once per device and remembered there. Each device keeps its own copy in IndexedDB, so the shelf and random page still work offline. Adding, editing and deleting need a connection; when offline, say so plainly rather than failing silently. Single user, so if the same book is edited in two places, the latest edit wins. Photos travel with their book.
+
+**Keep the books already on my phone.** The first time v0.2 runs on a device that has books, upload them before anything else, and keep the local copies until the upload succeeds.
+
+**Publisher.** Add an optional publisher field to the book details form, prefilled from Google Books or Open Library when the match has one. The Add screen gets an optional publisher field too, used to narrow the search. Wherever the author shows, show the publisher instead when there's no author—my Gestalten book has no author.
+
+**Worker conventions.**
+
+- CORS: allow `https://jamien-liston.github.io` and every header the app sends, including the passphrase header and `content-type`, from the start.
+- A wrong or missing passphrase gets a 401.
+- I deploy the Worker myself with `npx wrangler deploy`, before pushing the front end—new routes would otherwise 404.
+
+### v0.2 done when
+
+- The two books already on my phone survive the update and show up on the Mac.
+- A book added on the phone shows on the Mac after a refresh, and an edit on the Mac shows on the phone. A short delay is fine.
+- Deleting a book on one device removes it from the other.
+- curl with a wrong passphrase gets a 401, and the app shows a plain message for a wrong passphrase.
+- In flight mode, the shelf and random page still work, and adding or editing says it needs a connection.
+- A book with no author shows its publisher where the author would be.
+
+## v0.3—parked, don't build yet
+
+Photograph the cover, or the ISBN on the back, and have Claude read it through the v0.2 Worker (`ANTHROPIC_API_KEY` as a Worker secret, as in Mirage). The ISBN pins the exact edition, so the page count lines up. Use a plain file input with `capture` rather than a live camera view.
 
 ## Data
 
-Browser storage only—localStorage or IndexedDB, your call, but tell me which and why. Per book: `id`, `title`, `author`, `cover` (URL or resized image), `pageCount` (if known), `startPage`, `endPage`, `source` (`googlebooks`, `openlibrary` or `manual`), `addedAt`.
+v0.1 keeps books in IndexedDB on the device. From v0.2, the Worker's KV store holds the shelf and IndexedDB is each device's offline copy. Per book: `id`, `title`, `author`, `publisher` (v0.2), `cover` (URL or resized image), `pageCount` (if known), `startPage`, `endPage`, `source` (`googlebooks`, `openlibrary` or `manual`), `addedAt`, `updatedAt` (v0.2).
 
 ## Stack and conventions
 
@@ -55,7 +78,7 @@ Browser storage only—localStorage or IndexedDB, your call, but tell me which a
 - Never commit, push or deploy—I do those myself.
 - Create a `CLAUDE.md` with these conventions, and keep a `HANDOFF.md` in the repo root updated at the end of each session.
 
-## Done when
+## v0.1 done when
 
 - Three real books added by typing their titles, with covers where the APIs have them.
 - One book added by hand with a cover photo.
