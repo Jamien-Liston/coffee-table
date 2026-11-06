@@ -121,6 +121,76 @@ test('stored ranges are checked before rolling', () => {
   assert.equal(Logic.hasValidRange({}), false);
 });
 
+// ---- Title tidy -------------------------------------------------------------
+
+function checkTitles(cases) {
+  for (const [typed, tidy] of cases) {
+    assert.equal(Logic.titleCase(typed), tidy, `"${typed}"`);
+  }
+}
+
+test('titles: every word capitalized, small words lowercase', () => {
+  checkTitles([
+    ['humans of new york', 'Humans of New York'],
+    ['Humans Of New York', 'Humans of New York'],
+    ['the history of an idea', 'The History of an Idea'],
+    ['mice and men', 'Mice and Men'],
+    ['art for the people', 'Art for the People'],
+    ['paris on foot in the rain', 'Paris on Foot in the Rain'],
+    ['places to go', 'Places to Go'],
+    ['now or never', 'Now or Never'],
+    ['paris by night at home', 'Paris by Night at Home'],
+  ]);
+});
+
+test('titles: small words capitalized when first, last or straight after a colon', () => {
+  checkTitles([
+    ['the art of the plant', 'The Art of the Plant'],
+    ['of mice and men', 'Of Mice and Men'],
+    ['worth fighting for', 'Worth Fighting For'],
+    ['star wars: the art of the film', 'Star Wars: The Art of the Film'],
+    ['2001: a space odyssey', '2001: A Space Odyssey'],
+    ['paris : a guide', 'Paris : A Guide'],
+    ['the', 'The'],
+  ]);
+});
+
+test('titles: a word with a capital after its first letter is left alone', () => {
+  checkTitles([
+    ['the MoMA collection', 'The MoMA Collection'],
+    ['iPhone photography', 'iPhone Photography'],
+    ['design in the UK', 'Design in the UK'],
+    ['THE UK AT NIGHT', 'THE UK AT NIGHT'],
+    ["the O'Keeffe museum", "The O'Keeffe Museum"],
+  ]);
+});
+
+test('titles: each part of a hyphenated word counts, and the first is always capitalized', () => {
+  checkTitles([
+    ['mid-century modern', 'Mid-Century Modern'],
+    ['Mid-century houses today', 'Mid-Century Houses Today'],
+    ['step-by-step', 'Step-by-Step'],
+    ['black-and-white photography', 'Black-and-White Photography'],
+    ['the a-z of design', 'The A-Z of Design'],
+    ['the in-between', 'The In-Between'],
+    ['built-in', 'Built-In'],
+    ['iPhone-ready homes', 'iPhone-Ready Homes'],
+  ]);
+});
+
+test('titles: only first letters change; numbers, spacing and punctuation stay', () => {
+  checkTitles([
+    ['"the art of war"', '"The Art of War"'],
+    ['21st-century design', '21st-Century Design'],
+    ['1000 chairs', '1000 Chairs'],
+    ['café ōsaka', 'Café Ōsaka'],
+    ['rock & roll', 'Rock & Roll'],
+    ["hitchcock's films", "Hitchcock's Films"],
+    ['  spaced   out  ', '  Spaced   Out  '],
+    ['', ''],
+  ]);
+});
+
 // ---- Shelf order ------------------------------------------------------------
 
 test('the shelf sorts by title, ignoring case and a leading The, A or An', () => {
@@ -256,6 +326,15 @@ test('Google query: title words in the title, author words in the author', () =>
     'intitle:Café intitle:Ōsaka intitle:1970s');
   assert.equal(Logic.googleQuery("Hitchcock's Films", ''),
     "intitle:Hitchcock's intitle:Films");
+});
+
+test('a title with hyphens inside words can be searched again without them', () => {
+  assert.equal(Logic.withoutHyphens('Mid-century houses today'), 'Midcentury houses today');
+  assert.equal(Logic.withoutHyphens(' Step-by-step   guide '), 'Stepbystep guide');
+  assert.equal(Logic.withoutHyphens('Jean‐Michel'), 'JeanMichel', 'a Unicode hyphen counts too');
+  for (const none of ['Humans of New York', 'Rock - Roll', '-Mid-', 'Mid--century', '']) {
+    assert.equal(Logic.withoutHyphens(none), '', `nothing to retry for "${none}"`);
+  }
 });
 
 test('search links are built safely, with the key only when there is one', () => {

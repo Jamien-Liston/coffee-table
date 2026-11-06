@@ -65,6 +65,21 @@ const Search = (() => {
     return Logic.fromOpenLibrary(await getJson(url, signal));
   }
 
+  // Searches one source. If a title with hyphens finds nothing, searches the
+  // same source again without them ("Mid-century" -> "Midcentury"), before
+  // the caller moves on to the next source. The author is never changed.
+  async function withHyphenRetry(source, title, author, signal) {
+    const matches = await source(title, author, signal);
+    const retry = Logic.withoutHyphens(title);
+    if (matches.length || !retry) return matches;
+    try {
+      return await source(retry, author, signal);
+    } catch (err) {
+      if (err.kind === 'aborted') throw err;
+      return matches; // the first search did answer: it found nothing
+    }
+  }
+
   // Google first, then Open Library. Resolves to
   //   { source, matches, googleSkipped, googleFoundNothing }
   // where googleSkipped explains, in plain words, why Open Library was used.
@@ -73,7 +88,7 @@ const Search = (() => {
     let googleSkipped;
     let googleFoundNothing = false;
     try {
-      const matches = await google(title, author, signal);
+      const matches = await withHyphenRetry(google, title, author, signal);
       if (matches.length) {
         return { source: 'googlebooks', matches, googleSkipped: '', googleFoundNothing };
       }
@@ -84,13 +99,13 @@ const Search = (() => {
       googleSkipped = googleProblem(err);
     }
     onFallback?.();
-    const matches = await openLibrary(title, author, signal);
+    const matches = await withHyphenRetry(openLibrary, title, author, signal);
     return { source: 'openlibrary', matches, googleSkipped, googleFoundNothing };
   }
 
   // Open Library only, for "Not it? Try Open Library".
   async function findOpenLibrary(title, author, { signal } = {}) {
-    const matches = await openLibrary(title, author, signal);
+    const matches = await withHyphenRetry(openLibrary, title, author, signal);
     return { source: 'openlibrary', matches, googleSkipped: '', googleFoundNothing: false };
   }
 

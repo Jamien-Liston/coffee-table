@@ -12,7 +12,7 @@
   let route = { view: 'shelf' };
   let currentBook = null; // the book on the random-page screen
   let pendingMatch = null; // what the details form starts from when adding
-  let draft = null; // the details form in progress: { mode, id, source, cover }
+  let draft = null; // the details form in progress: { mode, id, source, cover, titleTidied }
   let saving = false;
   let lastSearch = null; // { title, author }
   let searchControl = null;
@@ -70,7 +70,8 @@
         location.replace('#/');
         return;
       }
-      draft = { mode: 'edit', id: book.id, source: book.source, cover: book.cover };
+      // A saved title is already yours, so editing never tidies it.
+      draft = { mode: 'edit', id: book.id, source: book.source, cover: book.cover, titleTidied: true };
       Views.fillDetails({ mode: 'edit', book, guessed: false, backHref: Logic.bookRoute(book.id) });
     } else {
       // From a search match, or by hand (also after a reload, when the
@@ -78,7 +79,13 @@
       // starts at the page count when it's known.
       const start = pendingMatch || { source: 'manual', title: '', author: '', cover: '' };
       const pageCount = start.pageCount ?? '';
-      draft = { mode: 'new', id: null, source: start.source, cover: start.cover || '' };
+      draft = {
+        mode: 'new',
+        id: null,
+        source: start.source,
+        cover: start.cover || '',
+        titleTidied: Boolean(start.titleTidied),
+      };
       Views.fillDetails({
         mode: 'new',
         book: {
@@ -128,9 +135,13 @@
 
   $('add-by-hand').addEventListener('click', () => {
     const input = Views.searchInput();
+    const title = Logic.cleanText(input.title);
     pendingMatch = {
       source: 'manual',
-      title: Logic.cleanText(input.title),
+      // The title typed for the search arrives tidied, and that's its one
+      // tidy: change it on the next screen and your version stays.
+      title: Logic.titleCase(title),
+      titleTidied: title !== '',
       author: Logic.cleanText(input.author),
       cover: '',
       pageCount: null,
@@ -197,6 +208,51 @@
     draft.cover = '';
     Views.showCoverPreview('');
   });
+
+  // Leaving the title field tidies the title into title case, once per new
+  // book: change it afterwards and your version stays. (Add by hand brings
+  // the title over already tidied, and Edit never tidies.)
+  let titleEnteredIn = null; // the form that was showing when the title got focus
+  $('f-title').addEventListener('focus', () => {
+    titleEnteredIn = draft;
+  });
+  $('f-title').addEventListener('blur', () => {
+    const input = $('f-title');
+    const title = Logic.cleanText(input.value);
+    // A form filled in since the title got focus isn't the one being left.
+    if (!draft || draft !== titleEnteredIn || draft.titleTidied || !title) return;
+    draft.titleTidied = true;
+    input.value = Logic.titleCase(title);
+  });
+
+  // Tapping into a page field selects its number, so typing replaces it.
+  // Selecting when the field gets focus isn't enough on its own: Safari,
+  // on iPhone especially, then puts the caret where the finger landed (or
+  // at the start, after Return). So select again when the tap that focused
+  // the field lifts, and once more after everything else has run.
+  for (const field of ['pageCount', 'startPage', 'endPage']) {
+    const input = $(`f-${field}`);
+    let focusingTap = false; // a press that's about to focus the field
+    const selectAll = () => {
+      if (document.activeElement === input) input.setSelectionRange(0, input.value.length);
+    };
+    input.addEventListener('mousedown', () => {
+      focusingTap = document.activeElement !== input;
+    });
+    input.addEventListener('focus', () => {
+      selectAll();
+      setTimeout(selectAll, 0);
+    });
+    input.addEventListener('mouseup', (event) => {
+      if (!focusingTap) return;
+      focusingTap = false;
+      event.preventDefault(); // or lifting the finger puts the caret back where it landed
+      selectAll();
+    });
+    input.addEventListener('blur', () => {
+      focusingTap = false;
+    });
+  }
 
   // Return in a field moves on to the next one instead of saving early;
   // in the last field it just puts the keyboard away.

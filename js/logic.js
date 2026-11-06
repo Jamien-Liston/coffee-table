@@ -43,6 +43,62 @@ const Logic = (() => {
     return cleanText(value).slice(0, MAX_TEXT).trim();
   }
 
+  // ---- Titles -------------------------------------------------------------
+
+  // Kept lowercase inside a title unless first, last or straight after a colon.
+  const SMALL_WORDS = new Set([
+    'a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'in', 'nor', 'of', 'on', 'or', 'the', 'to',
+  ]);
+  const HAS_WORD = /[\p{L}\p{N}]/u;
+  const HYPHEN = /([-‐‑])/; // hyphen-minus, hyphen, non-breaking hyphen
+
+  // Title case that only ever changes the first letter of a word:
+  //   - small words (a, of, the…) lowercase unless first, last or after a colon
+  //   - every other word capitalized
+  //   - a word with a capital after its first letter left alone (MoMA, iPhone, UK)
+  //   - a word that starts with a digit left alone (21st, 1970s)
+  //   - each part of a hyphenated word counts as a word, and the first part
+  //     is always capitalized (Mid-Century, Step-by-Step, A-Z)
+  // Spacing and punctuation stay as they are.
+  function titleCase(text) {
+    const tokens = String(text ?? '').split(/(\s+)/);
+    const words = tokens.flatMap((token, i) => (HAS_WORD.test(token) ? [i] : []));
+    const first = words[0];
+    const last = words[words.length - 1];
+    let afterColon = false;
+    return tokens.map((token, i) => {
+      if (!HAS_WORD.test(token)) {
+        if (token.endsWith(':')) afterColon = true; // a colon on its own: "Paris : a guide"
+        return token;
+      }
+      const parts = token.split(HYPHEN);
+      const wordParts = parts.flatMap((part, k) => (HAS_WORD.test(part) ? [k] : []));
+      const compound = wordParts.length > 1;
+      const cased = parts.map((part, k) => {
+        if (!HAS_WORD.test(part)) return part;
+        const capitalize =
+          (k === wordParts[0] && (i === first || afterColon || compound)) ||
+          (i === last && k === wordParts[wordParts.length - 1]);
+        return caseWord(part, capitalize);
+      }).join('');
+      afterColon = token.endsWith(':');
+      return cased;
+    }).join('');
+  }
+
+  // Capitalizes one word's first letter, or lowercases it for a small word
+  // that doesn't have to be capitalized. Leaves alone a word that starts
+  // with a digit or has a capital after its first letter.
+  function caseWord(word, capitalize) {
+    const at = word.search(/[\p{L}\p{N}]/u);
+    const head = String.fromCodePoint(word.codePointAt(at));
+    const rest = word.slice(at + head.length);
+    if (/\p{N}/u.test(head) || /[\p{Lu}\p{Lt}]/u.test(rest)) return word;
+    const bare = (head + rest).replace(/[^\p{L}\p{N}]+$/u, '').toLowerCase();
+    const lower = !capitalize && SMALL_WORDS.has(bare);
+    return word.slice(0, at) + (lower ? head.toLowerCase() : head.toUpperCase()) + rest;
+  }
+
   // ---- Shelf order --------------------------------------------------------
 
   // Sort by title, ignoring case and a leading "The", "A" or "An".
@@ -172,6 +228,15 @@ const Logic = (() => {
     return `https://www.googleapis.com/books/v1/volumes?${params}`;
   }
 
+  // A book listed as "Midcentury" can be missed by a search for "Mid-century",
+  // so a hyphenated title that finds nothing is searched again without its
+  // hyphens. Returns that title, or '' when no word in it has a hyphen.
+  function withoutHyphens(title) {
+    const clean = cleanText(title);
+    const joined = clean.replace(/([\p{L}\p{N}])[-‐‑](?=[\p{L}\p{N}])/gu, '$1');
+    return joined === clean ? '' : joined;
+  }
+
   function openLibrarySearchUrl(title, author) {
     const params = new URLSearchParams({
       title: cleanText(title),
@@ -268,6 +333,7 @@ const Logic = (() => {
     randomPage,
     pickRandom,
     cleanText,
+    titleCase,
     sortBooks,
     validateBook,
     hasValidRange,
@@ -275,6 +341,7 @@ const Logic = (() => {
     googleCover,
     googleQuery,
     googleSearchUrl,
+    withoutHyphens,
     openLibrarySearchUrl,
     fromGoogle,
     fromOpenLibrary,
