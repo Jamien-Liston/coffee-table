@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob: https:; connect-src 'self' https://www.googleapis.com https://openlibrary.org; object-src 'none'; base-uri 'none'; form-action 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Coffee Table</title>
+<meta name="description" content="Opens your coffee table books at a random page.">
+<meta name="apple-mobile-web-app-title" content="Coffee Table">
+<meta name="theme-color" content="#F5F0E6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1C1A17" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="stylesheet" href="css/style.css">
+<script defer src="js/version.js"></script>
+<script defer src="js/config.js"></script>
+<script defer src="js/logic.js"></script>
+<script defer src="js/db.js"></script>
+<script defer src="js/search.js"></script>
+<script defer src="js/photo.js"></script>
+<script defer src="js/views.js"></script>
+<script defer src="js/app.js"></script>
+</head>
+<body>
+
+<!-- Screen 1: the shelf (home) -->
+<section class="view" id="view-shelf" aria-labelledby="shelf-heading" hidden>
+  <header class="bar">
+    <span></span>
+    <h1 class="bar-title" id="shelf-heading" tabindex="-1">Coffee Table</h1>
+    <a class="btn btn-quiet" href="#/add">Add</a>
+  </header>
+  <main class="page shelf-page">
+    <p class="notice" id="shelf-error" role="alert" hidden></p>
+    <div class="empty" id="shelf-empty" hidden>
+      <p class="empty-title">Your shelf is empty.</p>
+      <p>Add the coffee table books you never open, and the app will pick a page for you.</p>
+      <a class="btn btn-primary" href="#/add">Add your first book</a>
+    </div>
+    <ul class="grid" id="shelf-grid" aria-label="Your books"></ul>
+    <p class="version" id="app-version"></p>
+  </main>
+  <div class="dock" id="shelf-dock" hidden>
+    <button type="button" class="btn btn-primary btn-big" id="surprise">Surprise me</button>
+  </div>
+</section>
+
+<!-- Screen 2: add a book by searching -->
+<section class="view" id="view-add" aria-labelledby="add-heading" hidden>
+  <header class="bar">
+    <a class="btn btn-quiet" href="#/"><span aria-hidden="true">‹</span> Shelf</a>
+    <h1 class="bar-title" id="add-heading" tabindex="-1">Add a book</h1>
+    <span></span>
+  </header>
+  <main class="page">
+    <form class="form" id="search-form" novalidate>
+      <label for="search-title">Title</label>
+      <input id="search-title" name="title" type="text" maxlength="200" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <label for="search-author">Author <span class="optional">(optional)</span></label>
+      <input id="search-author" name="author" type="text" maxlength="200" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" enterkeyhint="search">
+      <button type="submit" class="btn btn-primary btn-wide" id="search-submit">Search</button>
+    </form>
+    <p class="status" id="search-status" role="status" aria-live="polite"></p>
+    <ul class="results" id="search-results" aria-label="Matches"></ul>
+    <div class="stack">
+      <button type="button" class="btn btn-secondary btn-wide" id="search-openlibrary" hidden>Not it? Try Open Library</button>
+      <button type="button" class="btn btn-secondary btn-wide" id="add-by-hand">Add by hand</button>
+    </div>
+  </main>
+</section>
+
+<!-- Screen 3: book details (after a match, by hand, or editing) -->
+<section class="view" id="view-details" aria-labelledby="details-heading" hidden>
+  <header class="bar">
+    <a class="btn btn-quiet" id="details-back" href="#/add"><span aria-hidden="true">‹</span> Back</a>
+    <h1 class="bar-title" id="details-heading" tabindex="-1">Add a book</h1>
+    <span></span>
+  </header>
+  <main class="page">
+    <form class="form" id="details-form" novalidate>
+      <div class="cover-field">
+        <div class="cover-preview" id="cover-preview"></div>
+        <div class="cover-actions">
+          <label class="btn btn-secondary file-button">
+            Take or choose photo
+            <input type="file" id="photo-input" accept="image/*" class="visually-hidden">
+          </label>
+          <button type="button" class="btn btn-quiet" id="cover-remove">Remove cover</button>
+        </div>
+        <p class="status" id="cover-status" role="status" aria-live="polite"></p>
+      </div>
+
+      <label for="f-title">Title</label>
+      <input id="f-title" name="title" type="text" enterkeyhint="next" maxlength="200" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" aria-describedby="f-title-error">
+      <p class="field-error" id="f-title-error"></p>
+
+      <label for="f-author">Author <span class="optional">(optional)</span></label>
+      <input id="f-author" name="author" type="text" enterkeyhint="next" maxlength="200" autocomplete="off" autocapitalize="words" autocorrect="off" spellcheck="false" aria-describedby="f-author-error">
+      <p class="field-error" id="f-author-error"></p>
+
+      <label for="f-pageCount">Page count <span class="optional">(optional)</span></label>
+      <input id="f-pageCount" name="pageCount" type="text" enterkeyhint="next" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" aria-describedby="f-pageCount-error">
+      <p class="field-error" id="f-pageCount-error"></p>
+
+      <fieldset class="range">
+        <legend>Main content</legend>
+        <p class="hint" id="range-hint">Skip the contents and introduction at the front, and the index and credits at the back.</p>
+        <p class="hint hint-strong" id="range-guess" hidden>These start as a guess from the page count. Check them against the book.</p>
+        <div class="range-row">
+          <div>
+            <label for="f-startPage">First page</label>
+            <input id="f-startPage" name="startPage" type="text" enterkeyhint="next" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" aria-describedby="range-hint f-startPage-error">
+            <p class="field-error" id="f-startPage-error"></p>
+          </div>
+          <div>
+            <label for="f-endPage">Last page</label>
+            <input id="f-endPage" name="endPage" type="text" enterkeyhint="done" inputmode="numeric" pattern="[0-9]*" maxlength="5" autocomplete="off" aria-describedby="range-hint f-endPage-error">
+            <p class="field-error" id="f-endPage-error"></p>
+          </div>
+        </div>
+      </fieldset>
+
+      <p class="notice" id="details-error" role="alert" hidden></p>
+      <button type="submit" class="btn btn-primary btn-big" id="details-save">Save book</button>
+      <button type="button" class="btn btn-danger btn-wide" id="details-delete" hidden>Delete book</button>
+    </form>
+  </main>
+</section>
+
+<!-- Screen 4: the random page -->
+<section class="view" id="view-book" aria-labelledby="book-title" hidden>
+  <header class="bar">
+    <a class="btn btn-quiet" href="#/"><span aria-hidden="true">‹</span> Shelf</a>
+    <span></span>
+    <a class="btn btn-quiet" id="book-edit" href="#/">Edit</a>
+  </header>
+  <main class="page book-page">
+    <div class="book-cover" id="book-cover"></div>
+    <h1 class="book-title" id="book-title" tabindex="-1"></h1>
+    <p class="book-author" id="book-author"></p>
+    <div class="page-block" id="page-block">
+      <p class="turn-to">Turn to page</p>
+      <p class="page-number" id="page-number"></p>
+      <p class="page-range" id="page-range"></p>
+    </div>
+    <p class="notice" id="book-problem" hidden></p>
+    <p class="visually-hidden" id="page-announce" role="status" aria-live="polite"></p>
+  </main>
+  <div class="dock" id="book-dock">
+    <button type="button" class="btn btn-primary btn-big" id="again">Again</button>
+  </div>
+</section>
+
+<noscript><p class="notice">This app needs JavaScript turned on.</p></noscript>
+</body>
+</html>
