@@ -98,11 +98,40 @@
         guessed: start.source !== 'manual' && pageCount !== '',
         backHref: '#/add',
       });
+      if (start.source === 'googlebooks' && start.pageCount == null && start.googleId) {
+        fetchPageCount(start, draft);
+      }
     }
-    Views.showCoverPreview(draft.cover);
+    previewDraftCover();
     Views.showView('details');
     window.scrollTo(0, 0);
     Views.focusHeading('details-heading');
+  }
+
+  // Shows the form's cover. A Google cover shows at the largest size Google
+  // really has, and that link is the one that gets saved.
+  function previewDraftCover() {
+    const target = draft;
+    const asked = target.cover;
+    Views.showCoverPreview(asked, (link) => {
+      if (draft === target && target.cover === asked) target.cover = link;
+    });
+  }
+
+  // A Google match whose search listing had no page count: ask for the
+  // volume's own record, which often has one, and fill it in if this form
+  // is still open. If that fails, the page count just stays blank.
+  async function fetchPageCount(match, target) {
+    if (navigator.onLine === false) return;
+    let pageCount;
+    try {
+      pageCount = await Search.googlePageCount(match.googleId);
+    } catch {
+      return;
+    }
+    if (!pageCount) return;
+    match.pageCount = pageCount; // so the form starts with it if reopened
+    if (draft === target && route.view === 'details') Views.fillLatePageCount(pageCount);
   }
 
   // ---- Shelf and random page ------------------------------------------------

@@ -1,6 +1,6 @@
 # Coffee Table: handoff
 
-v0.1.2 · 7 November 2026
+v0.1.3 · 7 November 2026
 
 ## What it is
 
@@ -8,7 +8,7 @@ A personal PWA that gets Jam to open the coffee table books that never get looke
 
 ## State
 
-v0.1.1 is live: v0.1.0 plus the Google Books key. v0.1.2 is built and checked on this Mac, but not committed or deployed.
+v0.1.2 is live, and Google Books search works on Jam's phone. v0.1.3 is built and checked on this Mac, but not committed or deployed.
 
 In the app since v0.1.0:
 
@@ -18,18 +18,35 @@ In the app since v0.1.0:
 - **Random page:** a large page number with an Again button.
 - **Offline:** in flight mode the app still opens and rolls pages. Searched covers may not show.
 
-New in v0.1.2:
+Since v0.1.2:
 
-- **Page fields select their number.** Tapping into Page count, First page or Last page selects the whole number, so typing replaces it. The same happens when you move in with Return, with the arrows above the keyboard, or by tapping the label. A second tap inside the active field places the caret as usual. On iPhone, Safari puts the caret where the finger landed just after the field gets focus, so the app selects again when the tap lifts, and once more after that.
-- **Title tidy.** Leaving the title field on the details form tidies the title into title case, once per new book:
+- **Page fields select their number** on focus, so typing replaces it.
+  - This works for a tap, Return, the arrows above the keyboard, or tapping the label.
+  - A second tap inside the active field places the caret as usual.
+  - On iPhone, Safari puts the caret where the finger landed just after focus, so the app selects again when the tap lifts, and once more after that.
+- **Title tidy:** leaving the title field on the details form tidies the title into title case, once per new book.
   - Small words stay lowercase unless they're first, last or straight after a colon: a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to.
-  - A word with a capital after its first letter is left alone (MoMA, iPhone, UK), and so is one that starts with a digit (21st).
-  - Each part of a hyphenated word counts as a word: Mid-Century, Step-by-Step, A-Z.
-  - Only first letters ever change.
-  - After the one tidy, Jam's changes stay.
+  - A word with a capital after its first letter is left alone (MoMA, iPhone, UK), and so is one that starts with a digit.
+  - Each part of a hyphenated word counts as a word: Mid-Century.
+  - Only first letters ever change, and after the one tidy, Jam's changes stay.
   - Add by hand brings the search title over already tidied, and that counts as its one tidy.
-  - Edit never tidies, because a saved title is already Jam's version.
-- **Hyphen retry.** If a title with a hyphen inside a word finds nothing, each service is searched again with those hyphens taken out before the app moves on: Google, Google without hyphens, Open Library, then Open Library without hyphens. "Not it? Try Open Library" does the same. The author is never changed. On 7 November, "Mid-century houses today" found nothing in either service, and "Midcentury houses today" found the book in both.
+  - Edit never tidies.
+- **Hyphen retry:** a title with a hyphen inside a word that finds nothing is searched again without those hyphens, in each service, before the app moves on. The author is never changed.
+
+New in v0.1.3:
+
+- **Covers fall back to a size Google really has.** Every cover steps down a size when Google returns its placeholder or the image fails to load. That covers search results, the details form, the shelf and the random page.
+  - Covers try zoom 3, 2, then 1. Search thumbnails try zoom 2, then 1.
+  - A cover stays hidden while it's trying, so the placeholder never flashes up.
+  - The details form saves the link that showed.
+  - Books saved earlier with a placeholder link show the real cover anyway. Edit, then Save changes, stores the working link.
+  - If every size fails (offline, say), the shelf shows the title card, and the saved link is kept.
+- **Page count from the book's own Google record.** When a Google match's search listing has no page count, the details form opens straight away and asks Google for that volume's own record.
+  - If the record has a page count, Page count and Last page fill in, with the "guess" hint.
+  - The app only fills a field that's still empty and that you're not typing in.
+  - If the request fails, both stay blank, as before.
+  - Example: A House in Japan is 0 pages in the listing and 272 in its record.
+  - The match's Google ID is used only for this request and isn't stored.
 
 Storage is IndexedDB, chosen over localStorage because photos would fill localStorage's roughly 5 MB within a few dozen books.
 
@@ -37,78 +54,101 @@ Storage is IndexedDB, chosen over localStorage because photos would fill localSt
 
 The key is in `js/config.js`, restricted to websites `https://jamien-liston.github.io/*` and to the Books API. GitHub may warn about it on push. That's expected for a restricted browser key.
 
-Jam reported Google Books giving no results in the app. Checked on 7 November 2026:
+No results on 7 November turned out to be the phone still running v0.1.0. It had no key, and without a key Google answers 429 "quota exceeded". The checks behind that:
 
-- The live `js/config.js` on github.io has the key and matches the repo.
-- curl with `Referer: https://jamien-liston.github.io/` gets results. With no Referer, Google answers 403 "Requests from referer <empty> are blocked", so the restriction works. Google also accepts the `Origin` header on its own, and every cross-site fetch sends it.
-- Nothing in the app sets a referrer policy, GitHub Pages sends no `Referrer-Policy` header, and the search fetch uses the browser's default.
-- The live v0.1.1 in headless Chrome sends `Referer: https://jamien-liston.github.io/` and shows "9 matches from Google Books" for Humans of New York.
-- Without a key, as in v0.1.0, Google answers 429 "quota exceeded". The app then says "… from Open Library, because Google Books is over its daily limit."
+- The live key worked with `Referer: https://jamien-liston.github.io/`. Google also accepts the `Origin` header on its own.
+- Nothing in the app or on GitHub Pages sets a referrer policy.
+- The live v0.1.1 got Google results in headless Chrome.
 
-Likely cause: the phone was still running v0.1.0 when it searched. A new version installs in the background and reloads the app only from the shelf, so a search made before that reload uses the old files. Two things rule out a stuck update. Safari has checked `importScripts` files such as `version.js` for changes since 2022 (WebKit bug 239657, iOS 16). And every file the service worker needs is live.
+Jam confirmed Google results on the phone the same day.
 
-Not yet confirmed on the phone. After a search, the line above the matches names the source and, if Google wasn't used, the reason.
+Searches should find the books you'd expect. The query requires every title word in the title and every author word in the author.
 
-Once Google answers on the phone, two more checks:
+## Google covers (checked 7 November 2026)
 
-- The covers look right. The app asks Google for 575px covers (`zoom=3`). If some show "image not available", lower `GOOGLE_COVER_ZOOM` in `js/logic.js` to 2.
-- Searches find the books you'd expect. The query requires every title word in the title and every author word in the author.
+Google answers a cover size it hasn't got with its grey "image not available" picture. It comes back as HTTP 200, not an error, so before v0.1.3 the app showed it as the cover.
 
-## Checks at v0.1.2
+- **A House in Japan** (Gestalten, Google ID `Gat80QEACAAJ`, ISBN 9783967042078):
+  - The only real image is 128×160, at zoom 1. Zoom 5 is a copy of it.
+  - Zoom 2, 3, 4 and 6 all return the placeholder.
+  - The same goes for a link built from the ID, with or without Google's `imgtk` token. Google's publisher-cover link (`/books/publisher/content/images/frontcover/<id>`) gives the 128×160 image at any size asked for.
+  - books.google.com itself shows the zoom 1 image.
+  - Open Library has no cover for the ISBN.
+- **Across seven books:** ebooks have real images at every size. Print-only records, like most coffee table books, often have only zoom 1.
+- **The placeholder** is the same file for every book, at exactly 300×391 (zoom 2), 575×750 (zoom 3), 800×1043 (zoom 4) or 1280×1670 (zoom 6).
+- **How the app spots it:**
+  - File type is no help: a real cover came back as PNG.
+  - Google sends no CORS headers on images, so the app can't inspect pixels.
+  - Instead it checks the loaded image's width and height (`Logic.isGooglePlaceholder`).
+  - Zoom 1 is always accepted. Google only gives a cover link when a real image exists, and its small no-cover picture is 128×170, a size real covers can have.
+- **If Google changes its placeholder,** "image not available" will come back. Update `GOOGLE_PLACEHOLDER_SIZES` in `js/logic.js`.
+
+## Checks at v0.1.3
 
 - `node --check` passes on every JS file.
-- `node test/logic.test.js`: 24 tests pass. On top of v0.1.0's they cover:
-  - the title tidy: small words, first, last and after a colon, words left alone, hyphenated words, numbers and punctuation
-  - which titles get a hyphen-free retry
-- End-to-end in headless Chrome at iPhone size, with touch taps and canned Google and Open Library replies: 31/31 passing. This was a throwaway script in the session scratchpad, not in the repo. It covered:
-  - every retry path: Google's retry finding the book, Google refusing, a retry that errors, nothing anywhere, no retry without a hyphen, and Not it? Try Open Library
-  - the title tidy: by hand, after a change, Add by hand, a picked match, an empty title, Save straight from the title, and Edit
-  - page fields: taps at different spots, typing over, Return from field to field, the label, and a mouse click
-  - no errors in the page
-- **Not tested on iPhone Safari.** This Mac has no Xcode, so no iOS Simulator, and Safari's remote automation is off. Chrome also passes a naive version that only selects on focus, so it can't vouch for the iPhone handling. The phone test below is the real check.
-- Security pass: nothing to fix. Titles still go on the page as text only, there are no new hosts, and the Content-Security-Policy is unchanged.
+- `node test/logic.test.js`: 27 tests pass. New ones cover:
+  - which cover sizes are tried
+  - the placeholder sizes, including real covers that must not count
+  - the volume record link and its page count
+  - keeping Google's volume ID
+- End-to-end in headless Chrome at iPhone size. These were throwaway scripts in the session scratchpad, not in the repo.
+  - v0.1.3, against a fake Google serving the real downloaded images: 25/25, in four runs out of five. The fifth crashed while the test browser was starting, before any check ran. It covered:
+    - search thumbnails, the preview and the saved link for A House in Japan
+    - Humans of New York keeping zoom 3
+    - books saved earlier on the shelf, the random page and Edit
+    - a cover that fails at every size
+    - the placeholder never showing
+    - the late page count against a field you're in, a page you've typed, leaving early, a failed request, and picking the same match again
+  - v0.1.2's 31 checks still pass.
+  - Live: the local v0.1.3 against the real Google API and real images: 8/8. Jam's github.io Referer was added to API requests, as the key requires.
+    - A House in Japan settles on its real 128×160 cover and fills 272 pages.
+    - Humans of New York keeps zoom 2.
+- **Not tested on iPhone Safari.** This Mac has no Xcode and Safari's remote automation is off. The phone test below is the real check.
+- Security pass: nothing to fix.
+  - The volume ID is checked against Google's ID pattern and encoded before it goes in a link.
+  - Every cover link still passes through `Logic.safeCover`.
+  - There are no new hosts, and the Content-Security-Policy is unchanged.
 
-## Phone test for v0.1.2
+## Phone test for v0.1.3
 
-1. Open the app from the Home Screen icon and check that v0.1.2 shows at the bottom of the shelf. If it shows an older version, stay on the shelf for a few seconds, or swipe the app away and reopen it.
-2. **Google:** search for Humans of New York. The line above the matches should say they're from Google Books. If not, note the line's exact wording.
-3. **Page fields:** on Add a book, clear the Title box and tap Add by hand. Type 304 in Page count and 296 in Last page, then tap Done.
-   - Tap First page. The 1 should be highlighted, and typing 9 should replace it.
-   - Tap Last page near its left end, then Page count in the middle, then Last page near its right end. The whole number should be highlighted each time.
-   - Tap again inside the highlighted field. The caret should go where you tapped.
-   - Tap Author, then the keyboard's Next. Page count should come up highlighted, then First page and Last page as you keep tapping Next.
-4. **Title:**
-   - On the same form, type "the art of the plant: a guide" in Title and tap Next. It should become "The Art of the Plant: A Guide".
-   - Change it to "the ART of plants" and leave the field. It should stay as typed.
-   - Go back to Add a book, type "humans of new york" and tap Add by hand. The title should arrive as "Humans of New York".
-   - Edit a saved book, change its title to all lowercase and leave the field. It should stay lowercase. Tap Back so nothing is saved.
-5. **Search:** search for "Mid-century houses today". The matches should include Midcentury Houses Today.
+1. Open the app from the Home Screen icon and check that v0.1.3 shows at the bottom of the shelf. If it shows an older version, stay on the shelf for a few seconds, or swipe the app away and reopen it.
+2. Search for A House in Japan. The Gestalten match (gestalten · 2026) should show its cover in the list, not "image not available".
+3. Tap it. The cover should show on the form. Within a second or so, Page count and Last page should fill in with 272, with the "guess" hint.
+4. If A House in Japan is already on your shelf, it should now show its real cover on the shelf and the random page. Open Edit and tap Save changes once to store the working link.
+5. Search for Humans of New York. The covers should look as sharp as before.
+
+If not yet done, these v0.1.2 checks still stand:
+
+- In a page field, tapping selects the number and typing replaces it.
+- Title tidy: "the art of the plant: a guide" should become "The Art of the Plant: A Guide" when you leave the field.
+- Searching "Mid-century houses today" should find Midcentury Houses Today.
 
 The v0.1 checks still stand: the 10–12 range, Surprise me, edit and delete, books surviving a restart, and flight mode.
 
 ## Known limits
 
 - Searched covers are links to Google or Open Library, so they can go missing offline (the brief allows this). Photos taken in the app are stored in it and always show.
+- Books with only Google's small image, like A House in Japan, look soft on the shelf. 128 pixels wide is all Google has.
+- Google's 128px images can come back sideways for landscape books, so the app now uses that size only when Google has nothing bigger.
+- A real cover that happens to be exactly one of the placeholder sizes drops one size. It's still the real cover, just smaller.
 - Open Library results are works, not editions. The year is the first publication and the page count is the median across editions, so treat both as hints.
-- Google's default 128px thumbnails can come back sideways for landscape books, which is why the app asks for the larger sizes everywhere.
 - The books live only on the phone. Removing the app from the Home Screen deletes them. The Home Screen app keeps its own storage, separate from Safari.
 - The title tidy follows its rules literally. "From A to Z" becomes "From a to Z", because a capital A reads as the word "a". "o'keeffe" becomes "O'keeffe", and an all-capitals title stays as it is. One fix by hand sticks.
 - Titles from a picked match are tidied only if you tap into the title and leave it.
 
 ## Next
 
-1. Jam: commit and push v0.1.2, then run the phone test above.
-2. Confirm Google Books results on the phone, or send the line above the matches.
-3. Jam to decide:
+1. Jam: commit and push v0.1.3, then run the phone test above.
+2. Jam to decide, from v0.1.2:
    - Should Edit tidy titles too?
    - Is the small-word list right? It goes beyond the brief's examples with as, at, but, by, nor and or. Words of four or more letters, such as with and from, are capitalised.
-4. Then v0.2, per BRIEF.md.
+3. Then v0.2, per BRIEF.md.
 
 ## Backlog
 
-- v0.3, parked in BRIEF.md: read a photo of the cover or ISBN with Claude, through the v0.2 Worker.
+- v0.3, parked in BRIEF.md: read a photo of the cover or ISBN with Claude, through the v0.2 Worker. That photo would also make a sharper cover for print-only books.
 - Maybe store searched covers so they also show offline.
 - Maybe export and import a backup of the shelf, since the books live only on the phone.
 - Mirage's service worker deletes every cache on the shared github.io origin except its own, so in a shared browser it can wipe this app's offline copy. This app refills its copy, but the fix belongs in Mirage: limit its deletions to its own prefix. Avoid the same pattern in bin-night's planned service worker.
-- Maybe commit the headless-Chrome end-to-end test as `test/smoke.mjs`, for one-command regression checks.
+- Maybe commit the headless-Chrome end-to-end tests as `test/smoke.mjs`, for one-command regression checks.
 - To let Claude check iPhone-specific behaviour, either install Xcode (for the iOS Simulator), or turn on Safari Settings → Developer → Allow remote automation. The second gives Mac Safari: the same engine, but with a mouse, not touch.

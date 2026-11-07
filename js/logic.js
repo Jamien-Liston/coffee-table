@@ -188,6 +188,39 @@ const Logic = (() => {
     }
   }
 
+  // Google answers a cover size it hasn't got with its grey "image not
+  // available" picture: HTTP 200, not an error, and always at exactly one of
+  // these sizes. Print-only books often have only the small zoom=1 image.
+  const GOOGLE_PLACEHOLDER_SIZES = new Set(['300x391', '575x750', '800x1043', '1280x1670']);
+
+  // Google's zoom levels, largest image first. zoom=5 is a smaller copy of
+  // zoom=1, so it's never worth stepping down to.
+  const GOOGLE_ZOOMS_BY_SIZE = [6, 4, 3, 2, 1];
+
+  function isGooglePlaceholder(width, height) {
+    return GOOGLE_PLACEHOLDER_SIZES.has(`${width}x${height}`);
+  }
+
+  // The links to try for a cover, best first. A Google cover steps down
+  // through the smaller sizes to zoom=1, which exists whenever Google gives
+  // a cover link at all. Any other cover is tried as it is.
+  function coverFallbacks(src) {
+    let url;
+    try {
+      url = new URL(src);
+    } catch {
+      return [src];
+    }
+    const from = GOOGLE_ZOOMS_BY_SIZE.indexOf(Number(url.searchParams.get('zoom')));
+    if (url.hostname !== 'books.google.com' || url.pathname !== '/books/content' || from < 0) {
+      return [src];
+    }
+    return [src, ...GOOGLE_ZOOMS_BY_SIZE.slice(from + 1).map((zoom) => {
+      url.searchParams.set('zoom', String(zoom));
+      return url.href;
+    })];
+  }
+
   // Google Books cover links come back as http:// with a page-curl effect.
   // Make them https, drop the curl and set the size.
   function googleCover(link, zoom) {
@@ -221,11 +254,25 @@ const Logic = (() => {
       q: googleQuery(title, author),
       printType: 'books',
       maxResults: '20',
-      fields: 'items(volumeInfo(title,subtitle,authors,publishedDate,' +
+      fields: 'items(id,volumeInfo(title,subtitle,authors,publishedDate,' +
         'pageCount,printedPageCount,imageLinks))',
     });
     if (key) params.set('key', key);
     return `https://www.googleapis.com/books/v1/volumes?${params}`;
+  }
+
+  // A Google volume's own record. It can have a page count when the search
+  // listing has none: A House in Japan is 0 pages in the listing, 272 here.
+  function googleVolumeUrl(id, key) {
+    const params = new URLSearchParams({ fields: 'volumeInfo(pageCount,printedPageCount)' });
+    if (key) params.set('key', key);
+    return `https://www.googleapis.com/books/v1/volumes/${encodeURIComponent(id)}?${params}`;
+  }
+
+  // The page count from a volume record, printed count first, or null.
+  function pageCountFromGoogle(json) {
+    const info = json?.volumeInfo ?? {};
+    return pageOrNull(info.printedPageCount) ?? pageOrNull(info.pageCount);
   }
 
   // A book listed as "Midcentury" can be missed by a search for "Mid-century",
@@ -256,6 +303,10 @@ const Logic = (() => {
     return Array.isArray(list) ? list.filter((s) => typeof s === 'string') : [];
   }
 
+  // Google's id for a volume, kept only if it looks like one. It's only used
+  // to ask for that volume's record, never stored.
+  const GOOGLE_ID = /^[A-Za-z0-9_-]{1,40}$/;
+
   // Google Books volumes -> matches. Each volume is one edition.
   function fromGoogle(json) {
     const items = Array.isArray(json?.items) ? json.items : [];
@@ -264,6 +315,7 @@ const Logic = (() => {
       const link = info.imageLinks?.thumbnail || info.imageLinks?.smallThumbnail;
       const date = typeof info.publishedDate === 'string' ? info.publishedDate : '';
       return {
+        googleId: typeof item?.id === 'string' && GOOGLE_ID.test(item.id) ? item.id : '',
         title: clip(info.title),
         subtitle: clip(info.subtitle),
         author: clip(strings(info.authors).join(', ')),
@@ -338,9 +390,13 @@ const Logic = (() => {
     validateBook,
     hasValidRange,
     safeCover,
+    isGooglePlaceholder,
+    coverFallbacks,
     googleCover,
     googleQuery,
     googleSearchUrl,
+    googleVolumeUrl,
+    pageCountFromGoogle,
     withoutHyphens,
     openLibrarySearchUrl,
     fromGoogle,

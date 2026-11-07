@@ -100,6 +100,12 @@ p {
   white-space: nowrap;
 }
 
+/* A Google cover still being tried at a smaller size (Views.coverImage).
+   Hidden, so Google's "image not available" picture never shows. */
+img.cover-trying {
+  visibility: hidden;
+}
+
 /* ---- Screens ------------------------------------------------------------ */
 
 .view {

@@ -109,5 +109,12 @@ const Search = (() => {
     return { source: 'openlibrary', matches, googleSkipped: '', googleFoundNothing: false };
   }
 
-  return { find, findOpenLibrary };
+  // The page count from a Google volume's own record, or null. For a match
+  // whose search listing had none. Rejects with a SearchError on failure.
+  async function googlePageCount(id, { signal } = {}) {
+    const url = Logic.googleVolumeUrl(id, CONFIG.GOOGLE_BOOKS_KEY);
+    return Logic.pageCountFromGoogle(await getJson(url, signal));
+  }
+
+  return { find, findOpenLibrary, googlePageCount };
 })();

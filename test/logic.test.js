@@ -235,6 +235,7 @@ test('only https links and the app’s own JPEG photos are used as covers', () =
 const googleSample = {
   items: [
     {
+      id: 'shWcCwAAQBAJ',
       volumeInfo: {
         title: 'Humans of New York',
         subtitle: 'Stories',
@@ -247,7 +248,7 @@ const googleSample = {
         },
       },
     },
-    { volumeInfo: { title: 'No Cover Here', printedPageCount: 120, pageCount: 128 } },
+    { id: 'bad id/../x', volumeInfo: { title: 'No Cover Here', printedPageCount: 120, pageCount: 128 } },
     { volumeInfo: { authors: ['Untitled Author'] } },
     { volumeInfo: { title: 'Odd Data', authors: 'not a list', pageCount: -4, publishedDate: 1999 } },
   ],
@@ -273,6 +274,58 @@ test('Google results: https covers, no page curl, the larger size, plain fields'
   assert.equal(third.author, '');
   assert.equal(third.pageCount, null);
   assert.equal(third.year, '');
+
+  assert.equal(first.googleId, 'shWcCwAAQBAJ');
+  assert.equal(second.googleId, '', 'an id that does not look like Google’s is dropped');
+  assert.equal(third.googleId, '');
+});
+
+test('Google covers step down through the smaller sizes; other covers are tried as they are', () => {
+  const zoom = (n) =>
+    `https://books.google.com/books/content?id=Gat80QEACAAJ&printsec=frontcover&img=1&zoom=${n}&source=gbs_api`;
+  assert.deepEqual(Logic.coverFallbacks(zoom(3)), [zoom(3), zoom(2), zoom(1)]);
+  assert.deepEqual(Logic.coverFallbacks(zoom(2)), [zoom(2), zoom(1)]);
+  assert.deepEqual(Logic.coverFallbacks(zoom(1)), [zoom(1)]);
+  assert.deepEqual(Logic.coverFallbacks(zoom(5)), [zoom(5)], 'zoom=5 is already the smallest');
+
+  const withToken = `${zoom(3)}&imgtk=AFLRE7x_y-z`;
+  assert.deepEqual(Logic.coverFallbacks(withToken).map((u) => new URL(u).searchParams.get('imgtk')),
+    ['AFLRE7x_y-z', 'AFLRE7x_y-z', 'AFLRE7x_y-z'], 'the rest of the link is kept');
+
+  for (const other of [
+    'https://covers.openlibrary.org/b/id/8291452-L.jpg',
+    'data:image/jpeg;base64,/9j/4AAQSkZJRg==',
+    'https://books.google.com/books/publisher/content/images/frontcover/abc?fife=w400-h600',
+    'https://example.com/books/content?zoom=3',
+  ]) {
+    assert.deepEqual(Logic.coverFallbacks(other), [other], other);
+  }
+});
+
+test('Google’s “image not available” picture is recognised by its exact size', () => {
+  for (const [w, h] of [[300, 391], [575, 750], [800, 1043], [1280, 1670]]) {
+    assert.equal(Logic.isGooglePlaceholder(w, h), true, `${w}x${h}`);
+  }
+  // Real covers measured on 7 November 2026, then Google's small no-cover
+  // picture, which is the same size as some real covers so isn't counted.
+  for (const [w, h] of [[128, 160], [300, 383], [575, 733], [800, 1020], [575, 690], [575, 751], [128, 170], [0, 0]]) {
+    assert.equal(Logic.isGooglePlaceholder(w, h), false, `${w}x${h}`);
+  }
+});
+
+test('a Google volume’s own record gives the page count when the listing has none', () => {
+  const url = new URL(Logic.googleVolumeUrl('Gat80QEACAAJ', 'KEY123'));
+  assert.equal(url.origin + url.pathname, 'https://www.googleapis.com/books/v1/volumes/Gat80QEACAAJ');
+  assert.equal(url.searchParams.get('key'), 'KEY123');
+  assert.equal(url.searchParams.get('fields'), 'volumeInfo(pageCount,printedPageCount)');
+  assert.equal(new URL(Logic.googleVolumeUrl('a/../b?x', '')).pathname, '/books/v1/volumes/a%2F..%2Fb%3Fx');
+  assert.equal(new URL(Logic.googleVolumeUrl('x', '')).searchParams.has('key'), false);
+
+  assert.equal(Logic.pageCountFromGoogle({ volumeInfo: { pageCount: 272, printedPageCount: 270 } }), 270);
+  assert.equal(Logic.pageCountFromGoogle({ volumeInfo: { pageCount: 272 } }), 272);
+  for (const none of [{ volumeInfo: { pageCount: 0 } }, { volumeInfo: { pageCount: '272' } }, {}, null]) {
+    assert.equal(Logic.pageCountFromGoogle(none), null, JSON.stringify(none));
+  }
 });
 
 test('Google results: an empty or odd response gives no matches', () => {
@@ -342,6 +395,7 @@ test('search links are built safely, with the key only when there is one', () =>
   assert.equal(plain.origin, 'https://www.googleapis.com');
   assert.equal(plain.searchParams.get('q'), 'intitle:A intitle:B inauthor:C');
   assert.equal(plain.searchParams.has('key'), false);
+  assert.ok(plain.searchParams.get('fields').startsWith('items(id,'), 'asks for each volume’s id');
   const keyed = new URL(Logic.googleSearchUrl('A', '', 'KEY123'));
   assert.equal(keyed.searchParams.get('key'), 'KEY123');
 

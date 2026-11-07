@@ -22,19 +22,49 @@ const Views = (() => {
     return node;
   }
 
-  // A cover <img>, or null when there's no usable cover. If it fails to load
-  // (offline, say) it removes itself, revealing whatever sits underneath.
+  // A cover <img>, or null when there's no usable cover. Google answers a
+  // size it hasn't got with its "image not available" picture, so a Google
+  // cover that comes back as that picture, or fails to load, tries the next
+  // size down, kept hidden until one is accepted. If nothing loads (offline,
+  // say) it removes itself, revealing whatever sits underneath. onLoad gets
+  // the image and the link that worked.
   function coverImage(src, { className, lazy = false, onLoad, onError } = {}) {
     const safe = Logic.safeCover(src);
     if (!safe) return null;
+    const tries = Logic.coverFallbacks(safe).map(Logic.safeCover).filter(Boolean);
     const img = el('img', { class: className, alt: '', decoding: 'async' });
     if (lazy) img.loading = 'lazy';
-    img.addEventListener('load', () => onLoad?.(img), { once: true });
-    img.addEventListener('error', () => {
+    if (tries.length > 1) img.classList.add('cover-trying');
+    let at = 0;
+
+    const stop = () => {
+      img.removeEventListener('load', loaded);
+      img.removeEventListener('error', tryNext);
+    };
+    function tryNext() {
+      at += 1;
+      if (at < tries.length) {
+        img.src = tries[at];
+        return;
+      }
+      stop();
       img.remove();
       onError?.();
-    }, { once: true });
-    img.src = safe;
+    }
+    function loaded() {
+      // The last size is the one Google listed, so it's real whatever its size.
+      if (at < tries.length - 1 && Logic.isGooglePlaceholder(img.naturalWidth, img.naturalHeight)) {
+        tryNext();
+        return;
+      }
+      stop();
+      img.classList.remove('cover-trying');
+      onLoad?.(img, tries[at]);
+    }
+
+    img.addEventListener('load', loaded);
+    img.addEventListener('error', tryNext);
+    img.src = tries[0];
     return img;
   }
 
@@ -245,10 +275,13 @@ const Views = (() => {
     if (first && focus) $(`f-${first}`).focus();
   }
 
-  function showCoverPreview(src) {
+  // onFound gets the link that showed: for a Google cover, possibly a
+  // smaller size than the one asked for.
+  function showCoverPreview(src, onFound) {
     const box = $('cover-preview');
     const none = (text) => el('span', { class: 'cover-none', text });
     const img = coverImage(src, {
+      onLoad: (_img, link) => onFound?.(link),
       // The failed image has removed itself. Only fill the gap if nothing
       // newer (a fresh photo, say) has taken its place in the meantime.
       onError: () => {
@@ -257,6 +290,19 @@ const Views = (() => {
     });
     box.replaceChildren(img || none('No cover'));
     $('cover-remove').hidden = !img;
+  }
+
+  // A page count that arrived after the form opened. Fills Page count, and
+  // Last page as a guess, but only where they're empty and not being typed in.
+  function fillLatePageCount(pageCount) {
+    const fill = (field) => {
+      const input = $(`f-${field}`);
+      if (input.value !== '' || document.activeElement === input) return false;
+      input.value = String(pageCount);
+      return true;
+    };
+    fill('pageCount');
+    if (fill('endPage')) $('range-guess').hidden = false;
   }
 
   function coverStatus(text) {
@@ -291,6 +337,7 @@ const Views = (() => {
     readDetails,
     showErrors,
     showCoverPreview,
+    fillLatePageCount,
     coverStatus,
     detailsProblem,
     setSaving,
