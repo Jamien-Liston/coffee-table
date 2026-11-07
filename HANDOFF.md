@@ -1,6 +1,6 @@
 # Coffee Table: handoff
 
-v0.1.3 · 7 November 2026
+v0.1.4 · 7 November 2026
 
 ## What it is
 
@@ -8,7 +8,7 @@ A personal PWA that gets Jam to open the coffee table books that never get looke
 
 ## State
 
-v0.1.2 is live, and Google Books search works on Jam's phone. v0.1.3 is built and checked on this Mac, but not committed or deployed.
+v0.1.3 is live, and Google Books search works on Jam's phone. v0.1.4 is built and checked on this Mac, but not committed or deployed.
 
 In the app since v0.1.0:
 
@@ -25,17 +25,17 @@ Since v0.1.2:
   - A second tap inside the active field places the caret as usual.
   - On iPhone, Safari puts the caret where the finger landed just after focus, so the app selects again when the tap lifts, and once more after that.
 - **Title tidy:** leaving the title field on the details form tidies the title into title case, once per new book.
-  - Small words stay lowercase unless they're first, last or straight after a colon: a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to.
+  - Small words stay lowercase unless they're first, last or straight after a colon: a, an, and, as, at, but, by, for, in, nor, of, on, or, the, to. Jam confirmed this list on 7 November. Longer words such as with and from are capitalised.
   - A word with a capital after its first letter is left alone (MoMA, iPhone, UK), and so is one that starts with a digit.
   - Each part of a hyphenated word counts as a word: Mid-Century.
   - Only first letters ever change, and after the one tidy, Jam's changes stay.
   - Add by hand brings the search title over already tidied, and that counts as its one tidy.
-  - Edit never tidies.
+  - Edit never tidies, because a saved title is already Jam's version. Jam confirmed this on 7 November.
 - **Hyphen retry:** a title with a hyphen inside a word that finds nothing is searched again without those hyphens, in each service, before the app moves on. The author is never changed.
 
-New in v0.1.3:
+Since v0.1.3:
 
-- **Covers fall back to a size Google really has.** Every cover steps down a size when Google returns its placeholder or the image fails to load. That covers search results, the details form, the shelf and the random page.
+- **Covers fall back to a size Google really has.** Every cover steps down a size when Google returns a stand-in picture or the image fails to load. That covers search results, the details form, the shelf and the random page.
   - Covers try zoom 3, 2, then 1. Search thumbnails try zoom 2, then 1.
   - A cover stays hidden while it's trying, so the placeholder never flashes up.
   - The details form saves the link that showed.
@@ -47,6 +47,14 @@ New in v0.1.3:
   - If the request fails, both stay blank, as before.
   - Example: A House in Japan is 0 pages in the listing and 272 in its record.
   - The match's Google ID is used only for this request and isn't stored.
+
+New in v0.1.4:
+
+- **The cover check knows all of Google's stand-ins.** It used to know only "image not available". On v0.1.3, Mid-century Modern Furniture (Dominic Bradbury) showed its real cover in the list but a blank grey cover on the details form. Now the check covers:
+  - Google's blank book cover
+  - strips cut from scanned pages
+  - anything more than three times wider than tall
+  - See Google covers below.
 
 Storage is IndexedDB, chosen over localStorage because photos would fill localStorage's roughly 5 MB within a few dozen books.
 
@@ -66,55 +74,70 @@ Searches should find the books you'd expect. The query requires every title word
 
 ## Google covers (checked 7 November 2026)
 
-Google answers a cover size it hasn't got with its grey "image not available" picture. It comes back as HTTP 200, not an error, so before v0.1.3 the app showed it as the cover.
+Google answers a cover size it hasn't got with a stand-in picture. It comes back as HTTP 200, not an error, so before v0.1.3 the app showed it as the cover. A scan of 94 photo-book volumes found three kinds, each always at fixed sizes:
 
-- **A House in Japan** (Gestalten, Google ID `Gat80QEACAAJ`, ISBN 9783967042078):
-  - The only real image is 128×160, at zoom 1. Zoom 5 is a copy of it.
-  - Zoom 2, 3, 4 and 6 all return the placeholder.
-  - The same goes for a link built from the ID, with or without Google's `imgtk` token. Google's publisher-cover link (`/books/publisher/content/images/frontcover/<id>`) gives the 128×160 image at any size asked for.
-  - books.google.com itself shows the zoom 1 image.
+| Stand-in | Sizes | Volumes |
+|---|---|---|
+| Grey "image not available" text: the same file for every book | 300×391 (zoom 2), 575×750 (zoom 3), 800×1043 (zoom 4), 1280×1670 (zoom 6) | 46 |
+| A blank grey-blue book cover with hatched bars: the same file for every book | 575×829 (zoom 3), 800×1153 (zoom 4) | 11 |
+| A strip cut from a scanned page, different for every book | 300×48 (zoom 2), 575×92 (zoom 3), 800×128 (zoom 4) | 20 |
+
+- **The scan:**
+  - 28 of the 94 have real covers at zoom 3. The other 66 have one only at zoom 1.
+  - Zoom 1 was real for all 94.
+  - The strips aren't only old library scans. Phaidon's *The History of English Interiors* strip just reads "ENGLISH".
+- **A House in Japan** (Gestalten, `Gat80QEACAAJ`, ISBN 9783967042078):
+  - Only zoom 1, at 128×160, is real. Zoom 2 and up are "image not available".
+  - books.google.com shows the same zoom 1 image.
   - Open Library has no cover for the ISBN.
-- **Across seven books:** ebooks have real images at every size. Print-only records, like most coffee table books, often have only zoom 1.
-- **The placeholder** is the same file for every book, at exactly 300×391 (zoom 2), 575×750 (zoom 3), 800×1043 (zoom 4) or 1280×1670 (zoom 6).
-- **How the app spots it:**
-  - File type is no help: a real cover came back as PNG.
+- **Mid-century Modern Furniture** (Dominic Bradbury, `9s-NEAAAQBAJ`):
+  - Only zoom 1, at 128×155, is real. Zoom 2 is "image not available", and zoom 3 and 4 are the blank cover.
+  - v0.1.3 didn't know the blank cover, so the details form, which starts at zoom 3, accepted it. The list thumbnail starts at zoom 2, so it stepped down to the real image.
+  - "Mid-century" finds nothing, and the hyphen retry finds the book. It's 0 pages in the listing and 192 in its record.
+- **The volume's own record doesn't help with covers.**
+  - Its links use `/books/publisher/content` with an `imgtk` token, not `/books/content`.
+  - They serve exactly the same images at every size, with or without the token.
+  - Neither does Google's publisher-cover link, `/books/publisher/content/images/frontcover/<id>`.
+  - The app only asks the record for page counts.
+- **How the app spots a stand-in** (`Logic.isGooglePlaceholder`): by the loaded image's exact width and height, or by its being more than three times wider than tall.
+  - File type is no help. A real cover can be a PNG, and the blank cover is a JPEG.
   - Google sends no CORS headers on images, so the app can't inspect pixels.
-  - Instead it checks the loaded image's width and height (`Logic.isGooglePlaceholder`).
   - Zoom 1 is always accepted. Google only gives a cover link when a real image exists, and its small no-cover picture is 128×170, a size real covers can have.
-- **If Google changes its placeholder,** "image not available" will come back. Update `GOOGLE_PLACEHOLDER_SIZES` in `js/logic.js`.
+- **If a stand-in gets through,** say because Google adds a new one, open the cover's link at that zoom to find its size, and add the size to `GOOGLE_PLACEHOLDER_SIZES` in `js/logic.js`.
 
-## Checks at v0.1.3
+## Checks at v0.1.4
 
 - `node --check` passes on every JS file.
-- `node test/logic.test.js`: 27 tests pass. New ones cover:
+- `node test/logic.test.js`: 27 tests pass. Since v0.1.2 they also cover:
   - which cover sizes are tried
-  - the placeholder sizes, including real covers that must not count
+  - all three kinds of stand-in, plus real covers that must not count, including a landscape one and a 3:1 one
   - the volume record link and its page count
   - keeping Google's volume ID
+- Replaying the check over the 94 scanned volumes: none would show a stand-in.
 - End-to-end in headless Chrome at iPhone size. These were throwaway scripts in the session scratchpad, not in the repo.
-  - v0.1.3, against a fake Google serving the real downloaded images: 25/25, in four runs out of five. The fifth crashed while the test browser was starting, before any check ran. It covered:
-    - search thumbnails, the preview and the saved link for A House in Japan
+  - Against a fake Google serving the real downloaded images: 30/30. The one run of v0.1.3's 25 checks that crashed did so while the test browser was starting, before any check ran. The checks covered:
+    - A House in Japan: search thumbnails, the preview and the saved link
+    - Bradbury's blank cover, skipped in the list and on the form
+    - a snippet book's strips
     - Humans of New York keeping zoom 3
     - books saved earlier on the shelf, the random page and Edit
     - a cover that fails at every size
-    - the placeholder never showing
+    - no stand-in ever showing
     - the late page count against a field you're in, a page you've typed, leaving early, a failed request, and picking the same match again
   - v0.1.2's 31 checks still pass.
-  - Live: the local v0.1.3 against the real Google API and real images: 8/8. Jam's github.io Referer was added to API requests, as the key requires.
-    - A House in Japan settles on its real 128×160 cover and fills 272 pages.
-    - Humans of New York keeps zoom 2.
+  - Live, against the real Google API and real images, with Jam's github.io Referer added to API requests as the key requires:
+    - Bradbury, searched as "Mid-century Modern Furniture" by Dominic Bradbury: the committed v0.1.3 reproduced the bug, with the form cover at zoom 3, 575×829.
+    - On v0.1.4 the form shows the real zoom 1, 128×155, and 192 pages.
+    - The A House in Japan and Humans of New York run: 8/8.
 - **Not tested on iPhone Safari.** This Mac has no Xcode and Safari's remote automation is off. The phone test below is the real check.
-- Security pass: nothing to fix.
-  - The volume ID is checked against Google's ID pattern and encoded before it goes in a link.
-  - Every cover link still passes through `Logic.safeCover`.
-  - There are no new hosts, and the Content-Security-Policy is unchanged.
+- Security pass: nothing to fix. v0.1.4 only adds sizes and one shape rule to the stand-in check. The volume ID is checked against Google's ID pattern and encoded before it goes in a link, and every cover link still passes through `Logic.safeCover`.
 
-## Phone test for v0.1.3
+## Phone test for v0.1.4
 
-1. Open the app from the Home Screen icon and check that v0.1.3 shows at the bottom of the shelf. If it shows an older version, stay on the shelf for a few seconds, or swipe the app away and reopen it.
-2. Search for A House in Japan. The Gestalten match (gestalten · 2026) should show its cover in the list, not "image not available".
-3. Tap it. The cover should show on the form. Within a second or so, Page count and Last page should fill in with 272, with the "guess" hint.
-4. If A House in Japan is already on your shelf, it should now show its real cover on the shelf and the random page. Open Edit and tap Save changes once to store the working link.
+1. Open the app from the Home Screen icon and check that v0.1.4 shows at the bottom of the shelf. If it shows an older version, stay on the shelf for a few seconds, or swipe the app away and reopen it.
+2. Search for Mid-century Modern Furniture by Dominic Bradbury and tap the match. The form should show the real cover, not a blank grey one. Page count and Last page should fill in with 192.
+3. If it's already on your shelf with the blank cover, it should now show the real one. Open Edit and tap Save changes once to store the working link.
+4. A House in Japan should still show its real cover in the list and on the form, with 272 pages.
 5. Search for Humans of New York. The covers should look as sharp as before.
 
 If not yet done, these v0.1.2 checks still stand:
@@ -128,9 +151,9 @@ The v0.1 checks still stand: the 10–12 range, Surprise me, edit and delete, bo
 ## Known limits
 
 - Searched covers are links to Google or Open Library, so they can go missing offline (the brief allows this). Photos taken in the app are stored in it and always show.
-- Books with only Google's small image, like A House in Japan, look soft on the shelf. 128 pixels wide is all Google has.
+- Books with only Google's small image, like A House in Japan and Mid-century Modern Furniture, look soft on the shelf. 128 pixels wide is all Google has.
 - Google's 128px images can come back sideways for landscape books, so the app now uses that size only when Google has nothing bigger.
-- A real cover that happens to be exactly one of the placeholder sizes drops one size. It's still the real cover, just smaller.
+- A real cover that happens to be exactly one of the stand-in sizes, or more than three times wider than tall, drops one size. It's still the real cover, just smaller.
 - Open Library results are works, not editions. The year is the first publication and the page count is the median across editions, so treat both as hints.
 - The books live only on the phone. Removing the app from the Home Screen deletes them. The Home Screen app keeps its own storage, separate from Safari.
 - The title tidy follows its rules literally. "From A to Z" becomes "From a to Z", because a capital A reads as the word "a". "o'keeffe" becomes "O'keeffe", and an all-capitals title stays as it is. One fix by hand sticks.
@@ -138,11 +161,8 @@ The v0.1 checks still stand: the 10–12 range, Surprise me, edit and delete, bo
 
 ## Next
 
-1. Jam: commit and push v0.1.3, then run the phone test above.
-2. Jam to decide, from v0.1.2:
-   - Should Edit tidy titles too?
-   - Is the small-word list right? It goes beyond the brief's examples with as, at, but, by, nor and or. Words of four or more letters, such as with and from, are capitalised.
-3. Then v0.2, per BRIEF.md.
+1. Jam: commit and push v0.1.4, then run the phone test above.
+2. Then v0.2, per BRIEF.md.
 
 ## Backlog
 

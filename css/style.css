@@ -101,7 +101,7 @@ p {
 }
 
 /* A Google cover still being tried at a smaller size (Views.coverImage).
-   Hidden, so Google's "image not available" picture never shows. */
+   Hidden, so Google's stand-in pictures never show. */
 img.cover-trying {
   visibility: hidden;
 }

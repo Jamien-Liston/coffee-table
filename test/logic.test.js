@@ -302,13 +302,21 @@ test('Google covers step down through the smaller sizes; other covers are tried 
   }
 });
 
-test('Google’s “image not available” picture is recognised by its exact size', () => {
-  for (const [w, h] of [[300, 391], [575, 750], [800, 1043], [1280, 1670]]) {
-    assert.equal(Logic.isGooglePlaceholder(w, h), true, `${w}x${h}`);
+test('Google’s stand-in pictures are recognised by their exact sizes', () => {
+  const standIns = {
+    'image not available': [[300, 391], [575, 750], [800, 1043], [1280, 1670]],
+    'blank cover': [[575, 829], [800, 1153]],
+    'snippet strip': [[300, 48], [575, 92], [800, 128]],
+    'any strip over three times wider than tall': [[600, 150], [1280, 200]],
+  };
+  for (const [kind, sizes] of Object.entries(standIns)) {
+    for (const [w, h] of sizes) assert.equal(Logic.isGooglePlaceholder(w, h), true, `${kind}: ${w}x${h}`);
   }
-  // Real covers measured on 7 November 2026, then Google's small no-cover
-  // picture, which is the same size as some real covers so isn't counted.
-  for (const [w, h] of [[128, 160], [300, 383], [575, 733], [800, 1020], [575, 690], [575, 751], [128, 170], [0, 0]]) {
+  // Real covers measured on 7 November 2026, a landscape cover, a 3:1 one,
+  // and Google's small no-cover picture, which is the same size as some real
+  // covers so isn't counted.
+  for (const [w, h] of [[128, 160], [128, 155], [300, 383], [575, 733], [800, 1020], [575, 690], [575, 886],
+    [575, 751], [575, 430], [600, 200], [128, 170], [0, 0]]) {
     assert.equal(Logic.isGooglePlaceholder(w, h), false, `${w}x${h}`);
   }
 });

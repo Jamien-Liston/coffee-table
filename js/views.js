@@ -23,11 +23,12 @@ const Views = (() => {
   }
 
   // A cover <img>, or null when there's no usable cover. Google answers a
-  // size it hasn't got with its "image not available" picture, so a Google
-  // cover that comes back as that picture, or fails to load, tries the next
-  // size down, kept hidden until one is accepted. If nothing loads (offline,
-  // say) it removes itself, revealing whatever sits underneath. onLoad gets
-  // the image and the link that worked.
+  // size it hasn't got with a stand-in picture ("image not available", a
+  // blank cover, a strip of page), so a Google cover that comes back as one
+  // of those, or fails to load, tries the next size down, kept hidden until
+  // one is accepted. If nothing loads (offline, say) it removes itself,
+  // revealing whatever sits underneath. onLoad gets the image and the link
+  // that worked.
   function coverImage(src, { className, lazy = false, onLoad, onError } = {}) {
     const safe = Logic.safeCover(src);
     if (!safe) return null;

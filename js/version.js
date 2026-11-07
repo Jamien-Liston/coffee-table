@@ -8,4 +8,4 @@
 //
 // Bump this on any change to index.html, css/, js/, the manifest or icons.
 // It is the whole release ritual: the cache name follows automatically.
-self.APP_VERSION = '0.1.3';
+self.APP_VERSION = '0.1.4';

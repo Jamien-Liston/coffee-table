@@ -188,17 +188,27 @@ const Logic = (() => {
     }
   }
 
-  // Google answers a cover size it hasn't got with its grey "image not
-  // available" picture: HTTP 200, not an error, and always at exactly one of
-  // these sizes. Print-only books often have only the small zoom=1 image.
-  const GOOGLE_PLACEHOLDER_SIZES = new Set(['300x391', '575x750', '800x1043', '1280x1670']);
+  // Google answers a cover size it hasn't got with a stand-in picture: HTTP
+  // 200, not an error, and always at exactly one of these sizes (checked
+  // across 94 books on 7 November 2026). Print-only books often have only the
+  // small zoom=1 image, which is always real.
+  const GOOGLE_PLACEHOLDER_SIZES = new Set([
+    // grey "image not available" text: one file for every book
+    '300x391', '575x750', '800x1043', '1280x1670',
+    // a blank grey-blue book cover with hatched bars: one file for every book
+    '575x829', '800x1153',
+    // a thin strip cut from a scanned page (snippet-view books)
+    '300x48', '575x92', '800x128',
+  ]);
 
   // Google's zoom levels, largest image first. zoom=5 is a smaller copy of
   // zoom=1, so it's never worth stepping down to.
   const GOOGLE_ZOOMS_BY_SIZE = [6, 4, 3, 2, 1];
 
+  // Also refuses anything more than three times wider than tall: a strip of
+  // page at some other size, never a cover.
   function isGooglePlaceholder(width, height) {
-    return GOOGLE_PLACEHOLDER_SIZES.has(`${width}x${height}`);
+    return GOOGLE_PLACEHOLDER_SIZES.has(`${width}x${height}`) || width > height * 3;
   }
 
   // The links to try for a cover, best first. A Google cover steps down
